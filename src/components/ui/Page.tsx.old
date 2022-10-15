@@ -1,0 +1,210 @@
+import TextareaAutosize from 'react-textarea-autosize'
+import { useEffect, useState, useRef } from 'react'
+// import WordCounter from './WordCounter'
+import { useSession } from 'next-auth/react'
+
+import {
+  getLocalStorage,
+  randomId,
+  setUpdateLocalStorage,
+} from 'src/utils/utils'
+import { PageContent } from 'src/types/Page'
+import { useDroppable } from '@dnd-kit/core'
+import { Scribble } from 'src/types/Scribbles'
+
+export default function Page({ id }: { id?: string | string[] }) {
+  const { data: session } = useSession()
+
+  const isMounted = useRef(false)
+
+  const [scribble, setScribble] = useState<Scribble>({
+    title: 'New Scribble',
+    id: id as string,
+    content: [],
+    created_at: new Date().toISOString(),
+  })
+  const [pageContent, setPageContent] = useState<PageContent[]>([])
+  const [textAreaValue, setTextAreaValue] = useState<string>('')
+  const [isReordering, setIsReordering] = useState<boolean>(false)
+  const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false)
+
+  const { isOver, setNodeRef } = useDroppable({
+    id: 'droppable',
+  })
+  const droppableStyle = {
+    color: isOver ? 'green' : undefined,
+  }
+
+  const handleEditing = () => {
+    // set page content as the textarea value
+    // so sanitise value and set it
+    const content = pageContent.map((f) => f.content)?.join('\n')
+
+    setTextAreaValue(content)
+    setIsReordering(!isReordering)
+  }
+
+  const handleClose = () => {
+    const divided = textAreaValue.split('\n')
+    const cont = divided.map((d) => ({
+      id: randomId(),
+      content: d,
+    }))
+
+    setPageContent(cont)
+    setIsReordering(false)
+    // update local storage
+    if (!session) {
+      const st = getLocalStorage('scribbles')
+
+      if (!st) {
+        setUpdateLocalStorage('scribbles', [
+          {
+            title: 'New Scribble',
+            content: [],
+            id: id as string,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        return
+      }
+
+      let curr = null
+
+      curr = st?.find((f) => f.id === id)
+
+      if (!curr) return
+
+      curr.content = cont
+
+      setUpdateLocalStorage('scribbles', st)
+      return
+    }
+    // update db
+  }
+
+  // find out a better way of doing this
+  // don't want to abuse useEffect
+  useEffect(() => {
+    if (!isReordering) {
+      setTextAreaValue(pageContent.map((f) => f.content)?.join('\n'))
+    }
+  }, [pageContent, isReordering])
+
+  // get initial data on first load
+  useEffect(() => {
+    if (!session && !isMounted.current) {
+      const h = getLocalStorage('scribbles')
+
+      if (!h) return
+      let s = null
+
+      if (Array.isArray(h)) {
+        s = h.find((f) => f.id === id)
+      }
+      if (!s) return
+
+      setScribble(s)
+      setPageContent(s.content)
+      isMounted.current = true
+    }
+  }, [id, session])
+
+  const handleChange = (value: string) => {
+    setTextAreaValue(value)
+  }
+
+  const handleTitleUpdate = (value: string) => {
+    // only update local storage for now
+    const local = getLocalStorage('scribbles')
+
+    if (!local) return
+
+    const curr = local.find((f) => f.id === id)
+
+    if (!curr || curr.title === value) {
+      setIsEditingTitle(false)
+      return
+    }
+
+    curr.title = value
+
+    try {
+      setUpdateLocalStorage('scribbles', local)
+    } catch (error) {
+      console.error(error)
+    }
+
+    setScribble((prevState: Scribble) => ({
+      ...prevState,
+      title: curr.title,
+    }))
+  }
+
+  return (
+    <>
+      <div className='w-full flex flex-wrap my-8'>
+        {!isEditingTitle ? (
+          <div onClick={() => setIsEditingTitle(true)}>
+            <h1 className='text-4xl font-extrabold tracking-tighter mb-4'>
+              {scribble?.title}
+            </h1>
+          </div>
+        ) : (
+          <input
+            type='text'
+            className='text-4xl w-max font-extrabold bg-transparent tracking-tighter mb-4 appearance-none'
+            autoFocus
+            defaultValue={scribble.title}
+            onChange={(e) => handleTitleUpdate(e.target.value)}
+            onBlur={() => setIsEditingTitle(false)}
+          />
+        )}
+
+        {pageContent?.length > 1 && (
+          <button
+            onClick={handleEditing}
+            className={`btn ${
+              isReordering ? 'btn-accent' : 'btn-primary'
+            } ml-auto mb-4`}
+          >
+            {isReordering ? 'done' : 'edit mode'}
+          </button>
+        )}
+
+        <div className='w-full relative transition-all bg-white border shadow-md border-gray-300 text-gray-800 font-serif text-[22px] h-full p-6'>
+          {pageContent && (
+            <>
+              {!isReordering ? (
+                <TextareaAutosize
+                  onBlur={handleClose}
+                  placeholder='Start writing...'
+                  defaultValue={textAreaValue}
+                  onChange={(e) => handleChange(e.target.value)}
+                />
+              ) : (
+                <div ref={setNodeRef} style={droppableStyle}>
+                  {pageContent.map((content: PageContent) => (
+                    <p
+                      className='border border-gray-200 hover:bg-blue-50 rounded-md p-2 mb-3 shadow-sm'
+                      id={content.id}
+                      key={content.id}
+                    >
+                      {content.content === '' ? (
+                        <span
+                          dangerouslySetInnerHTML={{ __html: `</br>` }}
+                        ></span>
+                      ) : (
+                        <>{content.content}</>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}

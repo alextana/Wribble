@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background: #eff2ef;
+}
+
+.logo h2 {
+  font-weight: 600;
+  font-style: italic;
+  font-family: 'Quicksand', sans-serif !important;
+}
+
+@media (max-width: 1400px) {
+  .container {
+    max-width: 90%;
+  }
+}
+
+textarea {
+  width: 100%;
+  border: none;
+  overflow: auto;
+  outline: none;
+
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  box-shadow: none;
+
+  resize: none; /*remove the resize handle on the bottom right*/
+}
+
+.ql-container {
+  padding: 1.2rem;
+  min-height: 60vh;
+  border: 0px !important;
+}
+
+.ql-container p {
+  font-size: 1rem;
+  line-height: 1.7rem !important;
+}
+
+.ql-toolbar {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 150;
+  border: 0px !important;
+  border-bottom: 1px solid #dfdddd !important;
+}
+
+.quill {
+  background: white;
+}
